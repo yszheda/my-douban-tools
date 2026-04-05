@@ -74,67 +74,90 @@ class DoubanCollector:
 
     def _get_collection_url(self, collection_type: str, start: int = 0) -> str:
         """生成收藏页面 URL"""
-        return f"https://music.douban.com/people/{self.user_id}/{collection_type}?start={start}"
+        # 使用 list 模式以便解析
+        return f"https://music.douban.com/people/{self.user_id}/{collection_type}?start={start}&mode=list"
 
-    def _parse_collection_page(self, html: str) -> List[AlbumEntry]:
+    def _parse_collection_page(self, html: str, mode: str = "list") -> List[AlbumEntry]:
         """解析收藏页面 HTML，提取专辑信息"""
         entries = []
         soup = BeautifulSoup(html, 'html.parser')
 
-        # 查找所有专辑条目
-        # 豆瓣收藏列表的 HTML 结构：div.article div.indent-table table
-        tables = soup.find_all('table', width='100%')
+        if mode == "list":
+            # List 模式：查找所有 link 元素，href 包含 /subject/
+            links = soup.find_all('a', href=lambda x: x and '/subject/' in x and 'people' not in x)
 
-        for table in tables:
-            try:
-                # 提取 subject_id 从图片链接
-                img_link = table.find('a', href=lambda x: x and '/subject/' in x)
-                if not img_link:
+            seen_ids = set()
+            for link in links:
+                try:
+                    href = link.get('href', '')
+                    # 跳过非 subject 链接
+                    if '/subject/' not in href:
+                        continue
+
+                    subject_id = href.split('/subject/')[-1].strip('/')
+
+                    # 去重
+                    if subject_id in seen_ids:
+                        continue
+                    seen_ids.add(subject_id)
+
+                    title = link.get('title', '') or link.get_text(strip=True)
+
+                    entry = AlbumEntry(
+                        subject_id=subject_id,
+                        title=title
+                    )
+                    entries.append(entry)
+
+                except Exception as e:
+                    print(f"[WARN] 解析条目失败：{e}")
                     continue
+        else:
+            # Grid/Table 模式：查找 table 元素
+            tables = soup.find_all('table', width='100%')
 
-                # 从 href 提取 subject_id
-                href = img_link.get('href', '')
-                subject_id = href.split('/subject/')[-1].strip('/')
+            for table in tables:
+                try:
+                    img_link = table.find('a', href=lambda x: x and '/subject/' in x)
+                    if not img_link:
+                        continue
 
-                # 提取标题
-                title_elem = table.find('a', href=lambda x: x and '/subject/' in x)
-                title = title_elem.get('title', '') if title_elem else ''
+                    href = img_link.get('href', '')
+                    subject_id = href.split('/subject/')[-1].strip('/')
 
-                # 提取演奏者/艺术家信息
-                artists_elem = table.find('span', class_='attrs')
-                artists = artists_elem.get_text(strip=True) if artists_elem else ''
-                # 清理"艺术家："前缀
-                if artists.startswith('艺术家：'):
-                    artists = artists.replace('艺术家：', '').strip()
+                    title_elem = table.find('a', href=lambda x: x and '/subject/' in x)
+                    title = title_elem.get('title', '') if title_elem else ''
 
-                # 提取评分
-                rating_elem = table.find('span', class_='rating')
-                rating = rating_elem.get('title', '') if rating_elem else ''
+                    artists_elem = table.find('span', class_='attrs')
+                    artists = artists_elem.get_text(strip=True) if artists_elem else ''
+                    if artists.startswith('艺术家：'):
+                        artists = artists.replace('艺术家：', '').strip()
 
-                # 提取短评
-                comment_elem = table.find('span', class_='comment')
-                comment = comment_elem.get_text(strip=True) if comment_elem else ''
+                    rating_elem = table.find('span', class_='rating')
+                    rating = rating_elem.get('title', '') if rating_elem else ''
 
-                # 提取已有标签
-                tags_elem = table.find('div', class_='tags')
-                tags = []
-                if tags_elem:
-                    tag_links = tags_elem.find_all('a')
-                    tags = [tag.get_text(strip=True) for tag in tag_links]
+                    comment_elem = table.find('span', class_='comment')
+                    comment = comment_elem.get_text(strip=True) if comment_elem else ''
 
-                entry = AlbumEntry(
-                    subject_id=subject_id,
-                    title=title,
-                    artists=artists,
-                    rating=rating,
-                    comment=comment,
-                    tags=tags
-                )
-                entries.append(entry)
+                    tags_elem = table.find('div', class_='tags')
+                    tags = []
+                    if tags_elem:
+                        tag_links = tags_elem.find_all('a')
+                        tags = [tag.get_text(strip=True) for tag in tag_links]
 
-            except Exception as e:
-                print(f"[WARN] 解析条目失败：{e}")
-                continue
+                    entry = AlbumEntry(
+                        subject_id=subject_id,
+                        title=title,
+                        artists=artists,
+                        rating=rating,
+                        comment=comment,
+                        tags=tags
+                    )
+                    entries.append(entry)
+
+                except Exception as e:
+                    print(f"[WARN] 解析条目失败：{e}")
+                    continue
 
         return entries
 
