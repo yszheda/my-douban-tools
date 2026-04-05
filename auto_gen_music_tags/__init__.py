@@ -11,6 +11,9 @@ __email__ = ""
 from .tag_generator import DoubanMusicTagGenerator, normalize_name, AlbumInfo
 from .browser_adder import DoubanBrowserTagAdder
 from .api_adder import DoubanApiTagAdder
+from .collector import DoubanCollector, AlbumEntry
+from .progress import ProgressManager, initialize_progress, load_progress
+from .batch_processor import BatchProcessor
 
 __all__ = [
     "DoubanMusicTagGenerator",
@@ -18,4 +21,10 @@ __all__ = [
     "AlbumInfo",
     "DoubanBrowserTagAdder",
     "DoubanApiTagAdder",
+    "DoubanCollector",
+    "AlbumEntry",
+    "ProgressManager",
+    "initialize_progress",
+    "load_progress",
+    "BatchProcessor",
 ]

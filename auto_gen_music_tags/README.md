@@ -33,15 +33,44 @@ pip install -r requirements.txt
 
 ## 快速开始
 
-### 1. 准备 Cookie
+### 1. 安装依赖
 
-从豆瓣音乐页面获取 cookie，保存到 `cookie.txt`：
+```bash
+pip install requests beautifulsoup4
+```
 
+或使用 `requirements.txt`：
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. 准备 Cookie
+
+**从浏览器获取豆瓣 Cookie：**
+
+1. 打开豆瓣音乐页面 (https://music.douban.com/)
+2. 登录你的豆瓣账号
+3. 按 F12 打开开发者工具
+4. 切换到 Network 标签
+5. 刷新页面
+6. 找到任意请求，查看 Request Headers
+7. 复制 `Cookie:` 后面的所有内容
+8. 粘贴到 `cookie.txt` 文件中
+
+或者使用 Chrome DevTools Console：
+```javascript
+copy(document.cookie)
+```
+
+然后粘贴到 `cookie.txt`：
 ```
 ck=abc123; other_cookie=value; ...
 ```
 
-### 2. 生成标签
+**注意：** Cookie 会过期，如果处理失败请重新获取。
+
+### 3. 生成标签
 
 ```python
 from auto_gen_music_tags import DoubanMusicTagGenerator
@@ -60,7 +89,7 @@ print(f"标签摘要：{result['tags_summary']}")
 tagger.save_results()
 ```
 
-### 3. 添加标签
+### 4. 添加标签
 
 #### 方式 A：浏览器模拟版（推荐）
 
@@ -95,6 +124,50 @@ python demo.py
 1. 从 `tags_{subject_id}.json` 加载标签
 2. 使用 API 版尝试添加
 3. 如果 API 失败，切换到浏览器模拟版
+
+## 批量处理
+
+批量为豆瓣音乐收藏列表中的专辑添加标签：
+
+```bash
+# 首次运行（导出收藏列表 + 处理）
+python -m auto_gen_music_tags.batch_processor --user-id 63343218
+
+# 从进度恢复（断点续跑）
+python -m auto_gen_music_tags.batch_processor --resume
+
+# 仅处理特定类型
+python -m auto_gen_music_tags.batch_processor --types collect do
+
+# 限制每种类型的数量
+python -m auto_gen_music_tags.batch_processor --max-items 5
+```
+
+### 命令行参数
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--user-id` | 豆瓣用户 ID | 63343218 |
+| `--cookie` | Cookie 文件路径 | cookie.txt |
+| `--progress` | 进度文件路径 | progress.json |
+| `--album-list` | 专辑列表文件路径 | album_list.json |
+| `--types` | 处理的收藏类型 | collect do wish |
+| `--max-items` | 每种类型最大处理数量 | 无限制 |
+| `--resume` | 从进度恢复（不重新导出） | False |
+| `--max-pages` | 导出时每种类型最大页数 | 无限制 |
+
+### 处理流程
+
+1. **导出收藏列表**：从豆瓣音乐用户主页抓取已听/在听/想听的专辑
+2. **初始化进度**：创建 progress.json 记录处理状态
+3. **逐个处理**：对每个专辑生成标签 + 添加标签
+4. **实时保存**：每处理完一个专辑立即保存进度
+5. **断点续跑**：中断后可从上次进度继续
+
+### 输出文件
+
+- `album_list.json`：导出的收藏列表
+- `progress.json`：处理进度（含状态：pending/done/failed）
 
 ## 配置
 
