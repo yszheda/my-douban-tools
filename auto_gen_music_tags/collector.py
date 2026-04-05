@@ -77,21 +77,32 @@ class DoubanCollector:
         # 使用 list 模式以便解析
         return f"https://music.douban.com/people/{self.user_id}/{collection_type}?start={start}&mode=list"
 
-    def _parse_collection_page(self, html: str, mode: str = "list") -> List[AlbumEntry]:
-        """解析收藏页面 HTML，提取专辑信息"""
+    def _parse_collection_page(self, html: str, mode: str = "list") -> tuple:
+        """解析收藏页面 HTML，提取专辑信息
+
+        Returns:
+            (entries, has_next): entries 是专辑列表，has_next 表示是否有下一页
+        """
         entries = []
         soup = BeautifulSoup(html, 'html.parser')
 
+        # 检查是否有"后页"链接
+        has_next = False
+        next_link = soup.find('a', text=lambda x: x and '后页' in x)
+        if next_link:
+            has_next = True
+
         if mode == "list":
             # List 模式：查找所有 link 元素，href 包含 /subject/
-            links = soup.find_all('a', href=lambda x: x and '/subject/' in x and 'people' not in x)
+            # 过滤掉包含 /people/ 的链接（用户主页链接）
+            links = soup.find_all('a', href=lambda x: x and '/subject/' in x)
 
             seen_ids = set()
             for link in links:
                 try:
                     href = link.get('href', '')
-                    # 跳过非 subject 链接
-                    if '/subject/' not in href:
+                    # 跳过包含 /people/ 的链接（用户主页）
+                    if '/people/' in href:
                         continue
 
                     subject_id = href.split('/subject/')[-1].strip('/')
@@ -159,7 +170,7 @@ class DoubanCollector:
                     print(f"[WARN] 解析条目失败：{e}")
                     continue
 
-        return entries
+        return entries, has_next
 
     def fetch_collection(self, collection_type: str, max_pages: int = None, delay: float = 2.0) -> List[AlbumEntry]:
         """
@@ -195,7 +206,7 @@ class DoubanCollector:
                     break
 
                 html = resp.text
-                entries = self._parse_collection_page(html)
+                entries, has_next = self._parse_collection_page(html)
 
                 if not entries:
                     print(f"[INFO] 没有更多条目")
@@ -204,8 +215,8 @@ class DoubanCollector:
                 all_entries.extend(entries)
                 print(f"       抓取到 {len(entries)} 个条目，累计 {len(all_entries)} 个")
 
-                # 检查是否有下一页
-                if len(entries) < self.items_per_page:
+                # 如果没有下一页，停止
+                if not has_next:
                     print(f"[INFO] 已达列表末尾")
                     break
 
