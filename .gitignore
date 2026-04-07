@@ -32,14 +32,10 @@ ENV/
 *.swo
 *~
 
-# Project specific
-*.json
-tags_*
-tag_result.json
-cookie.txt
-*.txt
-!requirements.txt
-!README.md
+# Claude Code / Superpowers (keep config, ignore local/secrets)
+.claude/worktrees/
+.claude/settings.local.json
+.claude/settings.local.json~
 
 # Test results
 results.json
@@ -48,3 +44,50 @@ tag_add_results.json
 # Temporary files
 *.tmp
 *.bak
+
+# ========== Project specific ==========
+
+# Sensitive files
+cookie.txt
+*.key
+*.secret
+
+# Generated data files (keep structure, ignore content)
+data/raw/*.json
+data/processed/*.json
+logs/*.log
+logs/*.json
+
+# Keep these specific files
+!data/processed/.gitkeep
+!logs/.gitkeep
+
+# Test output
+*.log
+!requirements.txt
+
+# MCP executor state files
+mcp_executor_progress.json
+batch_tag_progress.json
+export_progress.json
+
+# Result files
+result_*.json
+batch_tag_result.json
+
+# Exported data
+exported_ids.txt
+exported_ids_only.json
+album_list.json
+album_list_full.json
+page_data.json
+do_export.json
+do_page_*.json
+collect_page_*.json
+
+# Inject batch files
+inject_batch_*.js
+
+# Debug logs
+batch_a.log
+batch_c.log

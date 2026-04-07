@@ -1,0 +1,48 @@
+{
+  "project": {
+    "name": "my-douban-tools",
+    "description": "豆瓣音乐自动化工具 - 标签生成与批量管理",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "src": "src",
+    "tools": "tools",
+    "data": "data",
+    "logs": "logs",
+    "config": "config"
+  },
+  "tag_limits": {
+    "max_tags_per_album": 10,
+    "tag_min_length": 2,
+    "tag_max_length": 50
+  },
+  "delays": {
+    "browser": {
+      "navigate": 2.0,
+      "click": 1.0,
+      "fill": 0.5,
+      "save": 1.5
+    },
+    "api": {
+      "between_requests": 1.5
+    },
+    "batch": {
+      "between_albums": 5.0
+    }
+  },
+  "timeouts": {
+    "musicbrainz": 10,
+    "discogs": 15,
+    "deezer": 10,
+    "itunes": 10,
+    "lastfm": 10,
+    "allmusic": 15,
+    "douban": 10
+  },
+  "files": {
+    "cookie": "cookie.txt",
+    "album_list": "album_list_full.json",
+    "export_progress": "data/processed/export_progress.json",
+    "tag_progress": "data/processed/tag_progress.json"
+  }
+}
