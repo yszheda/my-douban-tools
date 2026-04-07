@@ -205,27 +205,6 @@ class McpExecutor:
                     return match.group(1)
         return None
 
-    def _extract_existing_tags(self, snapshot_text: str) -> List[str]:
-        """从快照中提取已有标签"""
-        tags: List[str] = []
-        lines = snapshot_text.split('\n')
-        in_tags_section = False
-
-        for line in lines:
-            if '我的标签' in line or '标签:' in line:
-                in_tags_section = True
-                continue
-            if in_tags_section:
-                # 查找标签文本（StaticText 元素）
-                if 'StaticText' in line and 'uid=2_' in line:
-                    match = re.search(r'StaticText "([^"]+)"', line)
-                    if match and match.group(1).strip():
-                        tags.append(match.group(1).strip())
-                # 遇到输入框后停止
-                if 'textbox' in line:
-                    break
-        return tags
-
     def add_tags_via_mcp(self, subject_id: str, tags: List[str]) -> Dict:
         """
         使用 MCP Chrome DevTools 工具添加标签
@@ -258,7 +237,7 @@ class McpExecutor:
             self._click_element(modify_uid)
             time.sleep(1)
 
-            # Step 4: 获取快照，找输入框并读取已有标签
+            # Step 4: 获取快照，找输入框
             snapshot = self._take_snapshot()
             snapshot_text = json.dumps(snapshot, ensure_ascii=False, indent=2) if isinstance(snapshot, dict) else str(snapshot)
 
@@ -269,21 +248,13 @@ class McpExecutor:
                 return result
             print(f"[OK] 输入框 uid={input_uid}")
 
-            # 读取已有标签
-            existing_tags = self._extract_existing_tags(snapshot_text)
-            if existing_tags:
-                print(f"[INFO] 已有标签：{' '.join(existing_tags[:5])}...")
-
-            # Step 5: 合并标签（去重）
-            all_tags = list(set(existing_tags + tags))[:MAX_TAGS_PER_ALBUM]
-            print(f"[INFO] 合并后标签：{' '.join(all_tags)}")
-
-            # Step 6: 填充标签
-            tags_str = ' '.join(all_tags)
+            # Step 5: 填充标签（直接使用生成的标签，不合并）
+            tags_str = ' '.join(tags)
+            print(f"[INFO] 填充标签：{tags_str}")
             self._fill_input(input_uid, tags_str)
             time.sleep(0.5)
 
-            # Step 7: 获取快照，找保存按钮
+            # Step 6: 获取快照，找保存按钮
             snapshot = self._take_snapshot()
             snapshot_text = json.dumps(snapshot, ensure_ascii=False, indent=2) if isinstance(snapshot, dict) else str(snapshot)
 
@@ -294,14 +265,14 @@ class McpExecutor:
                 return result
             print(f"[OK] 保存按钮 uid={save_uid}")
 
-            # Step 8: 点击保存
+            # Step 7: 点击保存
             self._click_element(save_uid)
             time.sleep(1.5)
 
             # 成功
             result['success'] = True
             result['message'] = '标签添加成功'
-            result['tags'] = all_tags
+            result['tags'] = tags
             print("[OK] 完成!")
 
             return result

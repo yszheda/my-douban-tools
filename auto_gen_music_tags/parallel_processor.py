@@ -7,9 +7,12 @@
 支持断点续传，每 10 张专辑保存一次进度。
 
 使用示例：
-    python parallel_processor.py --batch a --start 0 --end 2130
-    python parallel_processor.py --batch b --start 2131 --end 4260
-    python parallel_processor.py --batch c --start 4261 --end 6391
+    python -m auto_gen_music_tags.parallel_processor --batch a --start 0 --end 2130
+    python -m auto_gen_music_tags.parallel_processor --batch b --start 2131 --end 4260
+    python -m auto_gen_music_tags.parallel_processor --batch c --start 4261 --end 6391
+
+或者直接运行：
+    cd auto_gen_music_tags && python parallel_processor.py --batch a --start 0 --end 2130
 """
 
 import json
@@ -17,12 +20,17 @@ import os
 import sys
 import time
 import argparse
+from pathlib import Path
 from typing import Dict, List, Optional
 from datetime import datetime
 
-from .tag_generator import DoubanMusicTagGenerator
-from .browser_adder import DoubanBrowserTagAdder
-from .config import TAGS_PER_ALBUM_LIMIT
+# 添加项目根目录到路径
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+# 导入标签生成器（直接导入，不使用相对导入）
+from auto_gen_music_tags.tag_generator import DoubanMusicTagGenerator
+from auto_gen_music_tags.browser_adder import DoubanBrowserTagAdder
 
 
 # ========== 配置常量 ==========
@@ -44,7 +52,8 @@ class ParallelTagProcessor:
         start_index: int,
         end_index: int,
         cookie_file: str = "cookie.txt",
-        album_list_file: str = "album_list_full.json"
+        album_list_file: str = "album_list_full.json",
+        dry_run: bool = False
     ):
         """
         初始化处理器
@@ -61,6 +70,7 @@ class ParallelTagProcessor:
         self.end_index = end_index
         self.cookie_file = cookie_file
         self.album_list_file = album_list_file
+        self.dry_run = dry_run
 
         # 文件路径配置
         self.progress_file = f"progress_{batch_id}.json"
@@ -91,7 +101,16 @@ class ParallelTagProcessor:
 
         try:
             with open(self.album_list_file, 'r', encoding='utf-8') as f:
-                self.albums = json.load(f)
+                data = json.load(f)
+
+            # 处理嵌套结构：{collections: {collect: [...]}}
+            if isinstance(data, dict) and 'collections' in data:
+                self.albums = data['collections'].get('collect', [])
+            elif isinstance(data, list):
+                self.albums = data
+            else:
+                self.albums = []
+
             print(f"[INFO] 加载专辑列表：{len(self.albums)} 条记录")
         except Exception as e:
             print(f"[ERROR] 加载专辑列表失败：{e}")
@@ -184,7 +203,12 @@ class ParallelTagProcessor:
         subject_id = album.get('subject_id', '')
         title = album.get('title', 'Unknown')
 
-        print(f"\n[{index}/{self.end_index}] 处理：{title}")
+        # 清理标题中的特殊字符以避免编码问题
+        safe_title = title.encode('utf-8', errors='ignore').decode('utf-8')
+        # 进一步清理 GBK 无法表示的字符
+        safe_title = safe_title.encode('gbk', errors='ignore').decode('gbk')
+
+        print(f"\n[{index}/{self.end_index}] Processing: {safe_title}")
         print(f"            subject={subject_id}")
 
         result = {
@@ -218,20 +242,26 @@ class ParallelTagProcessor:
         print(f"         最终标签：{' '.join(all_tags[:5])}...")
 
         # Step 3: 添加标签（浏览器模拟版）
-        print("[Step 2] 添加标签...")
-        try:
-            add_result = self.browser_adder.add_tags(subject_id, all_tags)
-            if add_result.get('success', False):
-                result['success'] = True
-                result['message'] = '标签添加成功'
-                result['tags'] = all_tags
-                print(f"         [OK] {result['message']}")
-            else:
-                result['message'] = add_result.get('message', '未知错误')
+        if self.dry_run:
+            print("[Step 2] 跳过添加标签（dry-run 模式）")
+            result['success'] = True
+            result['message'] = 'dry-run 模式，已生成标签'
+            result['tags'] = all_tags
+        else:
+            print("[Step 2] 添加标签...")
+            try:
+                add_result = self.browser_adder.add_tags(subject_id, all_tags)
+                if add_result.get('success', False):
+                    result['success'] = True
+                    result['message'] = '标签添加成功'
+                    result['tags'] = all_tags
+                    print(f"         [OK] {result['message']}")
+                else:
+                    result['message'] = add_result.get('message', '未知错误')
+                    print(f"         [ERROR] {result['message']}")
+            except Exception as e:
+                result['message'] = f'添加标签失败：{e}'
                 print(f"         [ERROR] {result['message']}")
-        except Exception as e:
-            result['message'] = f'添加标签失败：{e}'
-            print(f"         [ERROR] {result['message']}")
 
         return result
 
@@ -406,6 +436,11 @@ def main():
         action='store_true',
         help='从进度文件恢复（断点续传）'
     )
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='仅生成标签，不实际添加（用于测试）'
+    )
 
     args = parser.parse_args()
 
@@ -415,7 +450,8 @@ def main():
         start_index=args.start,
         end_index=args.end,
         cookie_file=args.cookie,
-        album_list_file=args.album_list
+        album_list_file=args.album_list,
+        dry_run=args.dry_run
     )
 
     # 运行

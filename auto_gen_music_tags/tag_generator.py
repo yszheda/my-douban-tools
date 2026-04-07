@@ -547,7 +547,7 @@ class DoubanMusicTagGenerator:
             'Trio': ['trio'],
         }
 
-        has_orchestra = any('orchestra' in p.lower()() or 'symphony' in p.lower() or 'philharmonic' in p.lower()
+        has_orchestra = any('orchestra' in p.lower() or 'symphony' in p.lower() or 'philharmonic' in p.lower()
                            for p in self.album_info.performers)
 
         full_text = (self.album_info.title + ' ' + ' '.join(self.album_info.performers)).lower()
